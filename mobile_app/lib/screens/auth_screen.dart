@@ -84,17 +84,18 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       final data = jsonDecode(response.body);
+      final user = data['user'];  
       final storage = Storage();
-      await storage.set('user_id', data['user']['id']);
-      await storage.set('access_token', data['session']['access_token']);
+      await storage.set('user_id', user['id']);
 
-      print(data['user']);
-
-      // Provider.of<AuthProvider>(context, listen: false).setUser(
-      //   userId: data['user']['id'],
-      //   email: data['user']['email'],
-      //   displayName: data['user_metadata']['name'],
-      // );
+      Provider.of<AuthProvider>(context, listen: false).setUser(
+        userId: user['id'],
+        email: user['email'],
+        phone: user['user_metadata']?['phone'] ?? '',
+        displayName: user['user_metadata']?['display_name'] ??
+                    user['user_metadata']?['name'] ??
+                    'User'
+      );
 
       setState(() => _isLoading = false);
 
@@ -290,6 +291,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _phoneController = TextEditingController();
   bool _showPassword = false;
   bool _isLoading = false;
 
@@ -298,6 +300,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -317,6 +320,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'name': _nameController.text,
         'email': _emailController.text,
         'password': _passwordController.text,
+        'phone': _phoneController.text
       }),
     );
 
@@ -329,10 +333,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     final storage = Storage();
-    await storage.set('user_name', _nameController.text);
-    await storage.set('user_email', _emailController.text);
-    await storage.set(
-        'user_id', 'user_${DateTime.now().millisecondsSinceEpoch}');
+    final data = jsonDecode(response.body);
+    final user = data['user'];
+    await storage.set('user_id', user['id']);
 
     setState(() => _isLoading = false);
 
@@ -395,6 +398,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     return null;
                   },
                 ),
+                const SizedBox(height: 20),
+
+                // Phone number field
+                TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    hintText: "Phone number",
+                    prefixIcon: Icon(AppIcons.phoneIcon, size: 20),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter your phone number without country code';
+                    }
+                    return null;
+                  },
+                ),
+
                 const SizedBox(height: 20),
 
                 // Email Field

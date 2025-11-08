@@ -1,6 +1,5 @@
-// lib/screens/profile_screen.dart
-
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:mobile_app/utils/constants.dart';
 import 'package:mobile_app/widgets/bottom_nav.dart';
 import 'package:mobile_app/screens/home_screen.dart';
@@ -9,6 +8,7 @@ import 'package:mobile_app/screens/wallet_screen.dart';
 import 'package:mobile_app/screens/ride_history_screen.dart';
 import 'package:mobile_app/screens/auth_screen.dart';
 import 'package:mobile_app/storage.dart';
+import 'package:mobile_app/providers/auth_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -20,7 +20,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   void _navigateToScreen(String screen) {
     Widget? destination;
-    
+
     switch (screen) {
       case 'home':
         destination = const HomeScreen();
@@ -35,9 +35,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         destination = const RideHistoryScreen();
         break;
       case 'profile':
-        return; // Already on profile
+        return;
     }
-    
+
     if (destination != null) {
       Navigator.pushReplacement(
         context,
@@ -47,7 +47,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _handleLogout() async {
-    // Show confirmation dialog
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -60,9 +59,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Logout'),
           ),
         ],
@@ -70,11 +67,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (shouldLogout == true && mounted) {
-      // Clear user token
       final storage = Storage();
       await storage.clear();
 
-      // Navigate to login screen
+      // Clear global provider
+      Provider.of<AuthProvider>(context, listen: false).logout();
+
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const AuthScreen()),
@@ -85,6 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -100,19 +99,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // Profile Header
-                  _buildProfileHeader(),
-                  
-                  // User Info Cards
-                  _buildUserInfo(),
-                  
-                  // Settings Section
+                  _buildProfileHeader(auth),
+                  _buildUserInfo(auth),
                   _buildSettings(),
-                  
-                  // Logout Button
                   _buildLogoutButton(),
-                  
-                  const SizedBox(height: 100), // Space for bottom nav
+                  const SizedBox(height: 100),
                 ],
               ),
             ),
@@ -126,7 +117,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(AuthProvider auth) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(32),
@@ -139,7 +130,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Column(
         children: [
-          // Profile Avatar
           Container(
             width: 100,
             height: 100,
@@ -156,10 +146,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
-            child: const Center(
+            child: Center(
               child: Text(
-                'JD',
-                style: TextStyle(
+                (auth.displayName != null && auth.displayName!.isNotEmpty)
+                    ? auth.displayName!.substring(0, 1).toUpperCase()
+                    : '?',
+                style: const TextStyle(
                   fontSize: 40,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -168,24 +160,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          
-          // Name
-          const Text(
-            'John Doe',
-            style: TextStyle(
+
+          Text(
+            auth.displayName ?? 'User',
+            style: const TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
           const SizedBox(height: 8),
-          
-          // Member Since
-          Text(
-            '${AppStrings.memberSince} Jan 2024',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white.withOpacity(0.9),
+
+          Center(
+            child: Text(
+              'User ID: ${auth.userId ?? ''}',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.white.withOpacity(0.9),
+              ),
             ),
           ),
         ],
@@ -193,7 +185,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildUserInfo() {
+  Widget _buildUserInfo(AuthProvider auth) {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -201,19 +193,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildInfoCard(
             icon: AppIcons.emailIcon,
             label: AppStrings.email,
-            value: 'john@example.com',
+            value: auth.email ?? 'No Email',
           ),
           const SizedBox(height: 16),
           _buildInfoCard(
             icon: AppIcons.phoneIcon,
             label: AppStrings.phone,
-            value: '+1 (555) 123-4567',
-          ),
-          const SizedBox(height: 16),
-          _buildInfoCard(
-            icon: AppIcons.location,
-            label: AppStrings.address,
-            value: '123 Main St, City',
+            value: auth.phone ?? 'Not Provided Yet',
           ),
         ],
       ),
@@ -281,7 +267,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           _buildSettingsItem(
             icon: AppIcons.settingsIcon,
             label: AppStrings.accountSettings,

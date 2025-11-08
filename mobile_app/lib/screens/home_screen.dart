@@ -24,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _navigateToScreen(String screen) {
     Widget? destination;
-    
+
     switch (screen) {
       case 'home':
         return; // Already on home
@@ -41,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
         destination = const ProfileScreen();
         break;
     }
-    
+
     if (destination != null) {
       Navigator.push(
         context,
@@ -52,8 +52,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = Provider.of<AuthProvider>(context);
-    
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -66,22 +64,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   // Header
                   _buildHeader(),
-                  
+
                   // Welcome Banner
                   _buildWelcomeBanner(),
-                  
+
                   // Quick Stats
                   _buildQuickStats(),
-                  
+
                   // Main Action Button
                   _buildScanButton(),
-                  
+
                   // Nearby Bikes
                   _buildNearbyBikes(),
-                  
+
                   // Info Banner
                   _buildInfoBanner(),
-                  
+
                   const SizedBox(height: 100), // Space for bottom nav
                 ],
               ),
@@ -97,6 +95,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeader() {
+    final auth = Provider.of<AuthProvider>(context);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -152,13 +152,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
-                  'JD',
-                  style: TextStyle(
-                    color: Colors.white,
+                  (auth.displayName != null && auth.displayName!.isNotEmpty)
+                      ? auth.displayName!.substring(0, 1).toUpperCase()
+                      : '?',
+                  style: const TextStyle(
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -211,11 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            Icon(
-              AppIcons.zap,
-              size: 40,
-              color: Colors.white.withOpacity(0.9),
-            ),
+            Icon(AppIcons.zap, size: 40, color: Colors.white.withOpacity(0.9)),
           ],
         ),
       ),
@@ -387,7 +385,11 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  const Icon(AppIcons.location, size: 14, color: AppColors.primary),
+                  const Icon(
+                    AppIcons.location,
+                    size: 14,
+                    color: AppColors.primary,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     station.distance,
@@ -413,10 +415,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const Text(
                 "Available",
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
             ],
           ),

@@ -40,13 +40,13 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/signup', async (req, res) => {
-    const { name, email, password } = req.body;
+    const { name, phone, email, password } = req.body;
 
     try {
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
-            options: { data: { name } },
+            options: { data: { name, phone } },
         });
 
         if (error) throw error;
