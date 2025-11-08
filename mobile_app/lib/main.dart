@@ -6,6 +6,9 @@ import 'package:mobile_app/screens/home_screen.dart';
 import 'package:mobile_app/utils/theme.dart';
 import 'package:mobile_app/utils/constants.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:provider/provider.dart';
+import 'package:mobile_app/providers/auth_provider.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +28,12 @@ Future<void> main() async {
     ),
   );
   
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => AuthProvider(),
+      child: MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {

@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+const authRouter = require('./routes/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,5 +12,7 @@ app.use(express.json());
 app.get("/", (req, res) => {
     res.status(200).send({"message": "Server is running"});
 })
+
+app.use("/auth", authRouter);
 
 app.listen(PORT);

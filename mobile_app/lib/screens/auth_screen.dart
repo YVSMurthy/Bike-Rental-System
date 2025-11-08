@@ -5,6 +5,8 @@ import 'package:mobile_app/screens/home_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:provider/provider.dart';
+import 'package:mobile_app/providers/auth_provider.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -60,30 +62,39 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // final backendUri = dotenv.env['BACKEND_URI'];
-      // final response = await http.post(
-      //   Uri.parse('${backendUri}/api/auth/login'),
-      //   headers: {'Content-Type': 'application/json'},
-      //   body: jsonEncode({
-      //     'email': _emailController.text,
-      //     'password': _passwordController.text,
-      //   }),
-      // );
+      final backendUri = dotenv.env['BACKEND_URI'];
+      print("Backend URI: $backendUri");
+      final response = await http.post(
+        Uri.parse('$backendUri/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': _emailController.text,
+          'password': _passwordController.text,
+        }),
+      );
 
-      // if (response.statusCode != 200) {
-      //   setState(() => _isLoading = false);
-      //   if (mounted) {
-      //     ScaffoldMessenger.of(context).showSnackBar(
-      //       SnackBar(content: Text('Login Failed: ${response.body}')),
-      //     );
-      //   }
-      //   return;
-      // }
+      if (response.statusCode != 200) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Login Failed: ${response.body}')),
+          );
+        }
+        return;
+      }
 
-      // final data = jsonDecode(response.body);
+      final data = jsonDecode(response.body);
       final storage = Storage();
-      await storage.set('user_id', _emailController.text);
-      await storage.set('access_token', 'dummy_token');
+      await storage.set('user_id', data['user']['id']);
+      await storage.set('access_token', data['session']['access_token']);
+
+      print(data['user']);
+
+      // Provider.of<AuthProvider>(context, listen: false).setUser(
+      //   userId: data['user']['id'],
+      //   email: data['user']['email'],
+      //   displayName: data['user_metadata']['name'],
+      // );
 
       setState(() => _isLoading = false);
 
@@ -297,24 +308,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _isLoading = true);
     
-    // final backendUri = dotenv.env['BACKEND_URI'];
-    // final response = await http.post(
-    //   Uri.parse('${backendUri}/api/auth/signup'),
-    //   headers: {'Content-Type': 'application/json'},
-    //   body: jsonEncode({
-    //     'name': _nameController.text,
-    //     'email': _emailController.text,
-    //     'password': _passwordController.text,
-    //   }),
-    // );
+    final backendUri = dotenv.env['BACKEND_URI'];
+    print(backendUri);
+    final response = await http.post(
+      Uri.parse('$backendUri/auth/signup'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'name': _nameController.text,
+        'email': _emailController.text,
+        'password': _passwordController.text,
+      }),
+    );
 
-    // if (response.statusCode != 201) {
-    //   setState(() => _isLoading = false);
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     SnackBar(content: Text('Sign Up Failed: ${response.body}')),
-    //   );
-    //   return;
-    // }
+    if (response.statusCode != 201) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sign Up Failed: ${response.body}')),
+      );
+      return;
+    }
 
     final storage = Storage();
     await storage.set('user_name', _nameController.text);

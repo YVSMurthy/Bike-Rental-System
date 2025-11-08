@@ -1,5 +1,3 @@
-// lib/screens/home_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:mobile_app/utils/constants.dart';
 import 'package:mobile_app/widgets/bottom_nav.dart';
@@ -7,6 +5,8 @@ import 'package:mobile_app/screens/qr_scan_screen.dart';
 import 'package:mobile_app/screens/wallet_screen.dart';
 import 'package:mobile_app/screens/ride_history_screen.dart';
 import 'package:mobile_app/screens/profile_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:mobile_app/providers/auth_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -52,6 +52,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
