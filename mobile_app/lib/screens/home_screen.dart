@@ -7,6 +7,8 @@ import 'package:mobile_app/screens/ride_history_screen.dart';
 import 'package:mobile_app/screens/profile_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile_app/providers/auth_provider.dart';
+import 'package:mobile_app/providers/home_provider.dart';
+import 'package:mobile_app/models/bicycle.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,87 +18,72 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final List<BikeStation> nearbyBikes = [
-    BikeStation(id: 1, distance: '0.3 km', available: 12),
-    BikeStation(id: 2, distance: '0.8 km', available: 8),
-    BikeStation(id: 3, distance: '1.2 km', available: 15),
-  ];
 
-  void _navigateToScreen(String screen) {
-    Widget? destination;
+  @override
+  void initState() {
+    super.initState();
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final home = Provider.of<HomeProvider>(context, listen: false);
 
+    // Run init only ONCE due to flag inside provider
+    Future.microtask(() => home.init(auth));
+  }
+
+  Future<void> _onRefresh() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final home = Provider.of<HomeProvider>(context, listen: false);
+
+    await home.refreshLocation();
+    await home.refreshHomeData(auth);
+  }
+
+  void _navigateTo(String screen) {
+    Widget? dest;
     switch (screen) {
-      case 'home':
-        return; // Already on home
-      case 'qr-scan':
-        destination = const QRScanScreen();
-        break;
-      case 'wallet':
-        destination = const WalletScreen();
-        break;
-      case 'history':
-        destination = const RideHistoryScreen();
-        break;
-      case 'profile':
-        destination = const ProfileScreen();
-        break;
+      case 'qr-scan': dest = const QRScanScreen(); break;
+      case 'wallet': dest = const WalletScreen(); break;
+      case 'history': dest = const RideHistoryScreen(); break;
+      case 'profile': dest = const ProfileScreen(); break;
     }
-
-    if (destination != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => destination!),
-      );
-    }
+    if (dest != null) Navigator.push(context, MaterialPageRoute(builder: (_) => dest!));
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          // Content
-          Expanded(
+    return Consumer<HomeProvider>(
+      builder: (context, home, child) {
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: RefreshIndicator(
+            onRefresh: _onRefresh,
             child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header
-                  _buildHeader(),
-
-                  // Welcome Banner
-                  _buildWelcomeBanner(),
-
-                  // Quick Stats
-                  _buildQuickStats(),
-
-                  // Main Action Button
-                  _buildScanButton(),
-
-                  // Nearby Bikes
-                  _buildNearbyBikes(),
-
-                  // Info Banner
-                  _buildInfoBanner(),
-
-                  const SizedBox(height: 100), // Space for bottom nav
+                  _header(home, auth),
+                  _welcomeBanner(),
+                  _quickStats(home),
+                  _scanButton(),
+                  _nearbyBicycles(home),
                 ],
               ),
             ),
           ),
-        ],
-      ),
-      bottomNavigationBar: BottomNav(
-        currentScreen: 'home',
-        onNavigate: _navigateToScreen,
-      ),
+          bottomNavigationBar: BottomNav(
+            currentScreen: 'home',
+            onNavigate: _navigateTo,
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildHeader() {
-    final auth = Provider.of<AuthProvider>(context);
+  // ---------- UI BUILDERS ----------
 
+  Widget _header(HomeProvider home, AuthProvider auth) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -108,61 +95,29 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Current Location",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: const [
-                    Icon(AppIcons.location, size: 16, color: AppColors.primary),
-                    SizedBox(width: 4),
-                    Text(
-                      'Downtown Station',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.accent, AppColors.accentDark],
-                ),
-                borderRadius: BorderRadius.circular(22),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.accent.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Text(
-                  (auth.displayName != null && auth.displayName!.isNotEmpty)
-                      ? auth.displayName!.substring(0, 1).toUpperCase()
-                      : '?',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text("Current Location", style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              const SizedBox(height: 4),
+              Row(children: [
+                const Icon(Icons.location_on_rounded, size: 18, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Text(home.isLocating ? "Detecting..." : (home.currentLocality ?? "Unknown"),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: _onRefresh,
+                  child: const Icon(Icons.refresh_rounded, size: 18, color: AppColors.primary),
+                )
+              ]),
+            ]),
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: AppColors.accent,
+              child: Text(
+                (auth.displayName?.isNotEmpty ?? false)
+                    ? auth.displayName![0].toUpperCase()
+                    : "?",
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ),
           ],
@@ -171,195 +126,88 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildWelcomeBanner() {
+  Widget _welcomeBanner() {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppColors.primary, AppColors.primaryDark],
-          ),
+          gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withOpacity(0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Welcome Back",
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white.withOpacity(0.9),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  "Ready to ride?",
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-            Icon(AppIcons.zap, size: 40, color: Colors.white.withOpacity(0.9)),
-          ],
-        ),
+        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: const [
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text("Welcome Back", style: TextStyle(color: Colors.white70)),
+            SizedBox(height: 4),
+            Text("Ready to ride?",
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+          ]),
+          Icon(Icons.directions_bike_rounded, size: 38, color: Colors.white),
+        ]),
       ),
     );
   }
 
-  Widget _buildQuickStats() {
+  Widget _quickStats(HomeProvider home) {
+    final time = _fmt(home.totalRideTimeThisMonth);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildStatCard(
-              title: "Total Rides",
-              value: '47',
-              icon: AppIcons.trendingUp,
-              gradient: const [AppColors.primaryLight, AppColors.accentLight],
-              iconColor: AppColors.primaryDark,
-              valueColor: AppColors.primaryDark,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildStatCard(
-              title: "This Month",
-              value: '18h 45m',
-              icon: AppIcons.clock,
-              gradient: const [AppColors.accentLight, Color(0xFFE0F2FE)],
-              iconColor: AppColors.accentDark,
-              valueColor: AppColors.accentDark,
-            ),
-          ),
-        ],
-      ),
+      child: Row(children: [
+        Expanded(child: _stat("Total Rides", "${home.totalRidesThisMonth}", Icons.show_chart_rounded)),
+        const SizedBox(width: 12),
+        Expanded(child: _stat("Ride Time", time, Icons.schedule_rounded)),
+      ]),
     );
   }
 
-  Widget _buildStatCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required List<Color> gradient,
-    required Color iconColor,
-    required Color valueColor,
-  }) {
+  Widget _stat(String title, String value, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: gradient),
+        gradient: const LinearGradient(colors: [AppColors.primaryLight, AppColors.accentLight]),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
       ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: iconColor),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: iconColor,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: valueColor,
-            ),
-          ),
-        ],
-      ),
+      child: Column(children: [
+        Icon(icon, size: 22, color: AppColors.primaryDark),
+        const SizedBox(height: 6),
+        Text(title, style: TextStyle(fontSize: 12, color: AppColors.primaryDark)),
+        const SizedBox(height: 4),
+        Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+      ]),
     );
   }
 
-  Widget _buildScanButton() {
+  Widget _scanButton() {
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: ElevatedButton.icon(
-          onPressed: () => _navigateToScreen('qr-scan'),
-          icon: const Icon(AppIcons.scan, size: 24),
-          label: const Text(
-            "Scan QR Code to Rent",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
-          style: ElevatedButton.styleFrom(
-            elevation: 4,
-            shadowColor: AppColors.primary.withOpacity(0.4),
-          ),
-        ),
+      child: ElevatedButton.icon(
+        onPressed: () => _navigateTo("qr-scan"),
+        icon: const Icon(Icons.qr_code_scanner_rounded),
+        label: const Text("Scan QR to Unlock", style: TextStyle(fontSize: 18)),
+        style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 56)),
       ),
     );
   }
 
-  Widget _buildNearbyBikes() {
+  Widget _nearbyBicycles(HomeProvider home) {
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "Nearby Bikes",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              TextButton(
-                onPressed: () {},
-                child: const Text(
-                  "View all",
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.accent,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...nearbyBikes.map((station) => _buildBikeStationCard(station)),
-        ],
-      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          const Text("Nearby Bicycles", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          TextButton(onPressed: _onRefresh, child: const Text("Refresh")),
+        ]),
+        const SizedBox(height: 12),
+        if (home.isLoadingData) const Center(child: CircularProgressIndicator()),
+        if (!home.isLoadingData && home.nearby.isEmpty)
+          const Text("No bicycles found here.", style: TextStyle(color: AppColors.textSecondary)),
+        ...home.nearby.map(_bikeTile),
+      ]),
     );
   }
 
-  Widget _buildBikeStationCard(BikeStation station) {
+  Widget _bikeTile(Bicycle b) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -368,101 +216,29 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${"Station"} ${station.id}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  const Icon(
-                    AppIcons.location,
-                    size: 14,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    station.distance,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                station.available.toString(),
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                ),
-              ),
-              const Text(
-                "Available",
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-            ],
-          ),
-        ],
-      ),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text("${b.model}${b.color != null ? " (${b.color})" : ""}",
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          Row(children: [
+            const Icon(Icons.location_on_rounded, size: 14, color: AppColors.primary),
+            const SizedBox(width: 4),
+            Text(b.locality ?? '-'),
+          ])
+        ]),
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(b.status, style: TextStyle(color: b.status == "available" ? Colors.green : Colors.grey)),
+          const SizedBox(height: 4),
+          Text(b.assetCode ?? "", style: const TextStyle(color: AppColors.textSecondary)),
+        ]),
+      ]),
     );
   }
 
-  Widget _buildInfoBanner() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFEF3C7),
-          border: Border.all(color: const Color(0xFFFCD34D)),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: const [
-            Icon(AppIcons.warning, size: 20, color: Color(0xFFD97706)),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Complete your profile to unlock premium features',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF92400E),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  String _fmt(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60);
+    return h > 0 ? '${h}h ${m}m' : '${m}m';
   }
-}
-
-class BikeStation {
-  final int id;
-  final String distance;
-  final int available;
-
-  BikeStation({
-    required this.id,
-    required this.distance,
-    required this.available,
-  });
 }

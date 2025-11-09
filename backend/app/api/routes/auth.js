@@ -1,14 +1,3 @@
-// const express = require('express');
-// const { supabase } = require('../../service/supabaseClient');
-
-// const router = express.Router();
-
-// router.post("/login", async (req, res) => {
-//     console.log("Login request received");
-// })
-
-// module.exports = router;
-
 const express = require('express');
 const { supabase } = require('../../service/supabaseClient.js');
 

@@ -1,5 +1,3 @@
-// lib/screens/wallet_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:mobile_app/utils/constants.dart';
 import 'package:mobile_app/widgets/bottom_nav.dart';
@@ -7,6 +5,9 @@ import 'package:mobile_app/screens/home_screen.dart';
 import 'package:mobile_app/screens/qr_scan_screen.dart';
 import 'package:mobile_app/screens/ride_history_screen.dart';
 import 'package:mobile_app/screens/profile_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:mobile_app/providers/auth_provider.dart';
+import 'package:mobile_app/providers/wallet_provider.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -16,33 +17,31 @@ class WalletScreen extends StatefulWidget {
 }
 
 class _WalletScreenState extends State<WalletScreen> {
-  final List<Transaction> transactions = [
-    Transaction(
-      id: '1',
-      type: 'ride',
-      description: 'Ride to Central Park',
-      amount: -5.50,
-      date: DateTime.now(),
-    ),
-    Transaction(
-      id: '2',
-      type: 'topup',
-      description: 'Wallet Top-up',
-      amount: 50.00,
-      date: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-    Transaction(
-      id: '3',
-      type: 'ride',
-      description: 'Ride to Downtown',
-      amount: -3.25,
-      date: DateTime.now().subtract(const Duration(days: 2)),
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadWallet();
+  }
+
+  Future<void> _loadWallet() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final wallet = Provider.of<WalletProvider>(context, listen: false);
+
+    while (!auth.isInitialized) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+
+    await wallet.refreshWallet(auth, force: false);
+  }
+
+  Future<void> _onRefresh() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final wallet = Provider.of<WalletProvider>(context, listen: false);
+    await wallet.refreshWallet(auth, force: true);
+  }
 
   void _navigateToScreen(String screen) {
     Widget? destination;
-    
     switch (screen) {
       case 'home':
         destination = const HomeScreen();
@@ -51,7 +50,7 @@ class _WalletScreenState extends State<WalletScreen> {
         destination = const QRScanScreen();
         break;
       case 'wallet':
-        return; // Already on wallet
+        return;
       case 'history':
         destination = const RideHistoryScreen();
         break;
@@ -59,57 +58,70 @@ class _WalletScreenState extends State<WalletScreen> {
         destination = const ProfileScreen();
         break;
     }
-    
     if (destination != null) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => destination!),
+        MaterialPageRoute(builder: (_) => destination!),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(AppIcons.back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(AppStrings.wallet),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Balance Card
-                  _buildBalanceCard(),
-                  
-                  // Pending Due Banner
-                  _buildPendingDueBanner(),
-                  
-                  // Recent Transactions
-                  _buildTransactionsList(),
-                  
-                  const SizedBox(height: 100), // Space for bottom nav
-                ],
+    return Consumer<WalletProvider>(
+      builder: (context, wallet, child) {
+        if (!wallet.isInitialized) {
+          return const Scaffold(
+            backgroundColor: Colors.white,
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(AppIcons.back),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: const Text(AppStrings.wallet),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: wallet.isLoading ? null : _onRefresh,
               ),
+            ],
+          ),
+          body: RefreshIndicator(
+            onRefresh: _onRefresh,
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildBalanceCard(wallet),
+                        _buildTransactionsList(wallet),
+                        const SizedBox(height: 100),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
-      bottomNavigationBar: BottomNav(
-        currentScreen: 'wallet',
-        onNavigate: _navigateToScreen,
-      ),
+          bottomNavigationBar: BottomNav(
+            currentScreen: 'wallet',
+            onNavigate: _navigateToScreen,
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildBalanceCard() {
+  Widget _buildBalanceCard(WalletProvider wallet) {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Container(
@@ -138,14 +150,12 @@ class _WalletScreenState extends State<WalletScreen> {
                 fontSize: 12,
                 color: Colors.white.withOpacity(0.9),
                 fontWeight: FontWeight.w600,
-                letterSpacing: 1,
               ),
             ),
             const SizedBox(height: 12),
-            
-            const Text(
-              '\$24.50',
-              style: TextStyle(
+            Text(
+              '\$${wallet.balance.toStringAsFixed(2)}',
+              style: const TextStyle(
                 fontSize: 48,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -153,7 +163,6 @@ class _WalletScreenState extends State<WalletScreen> {
               ),
             ),
             const SizedBox(height: 32),
-            
             Row(
               children: [
                 Expanded(
@@ -191,9 +200,7 @@ class _WalletScreenState extends State<WalletScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -202,64 +209,14 @@ class _WalletScreenState extends State<WalletScreen> {
           const SizedBox(width: 8),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPendingDueBanner() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFEF3C7),
-          border: Border.all(color: const Color(0xFFFCD34D)),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            const Icon(
-              AppIcons.warning,
-              size: 24,
-              color: Color(0xFFD97706),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    AppStrings.pendingDue,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF92400E),
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    '\$12.75 due by tomorrow',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF92400E),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTransactionsList() {
+  Widget _buildTransactionsList(WalletProvider wallet) {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -280,17 +237,36 @@ class _WalletScreenState extends State<WalletScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          
-          ...transactions.map((transaction) => _buildTransactionCard(transaction)),
+          if (wallet.isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32.0),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (wallet.transactions.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(32.0),
+              child: Center(
+                child: Text(
+                  'No transactions yet',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            )
+          else
+            ...wallet.transactions.map(_buildTransactionCard),
         ],
       ),
     );
   }
 
-  Widget _buildTransactionCard(Transaction transaction) {
-    final isPositive = transaction.amount > 0;
-    final dateText = _formatDate(transaction.date);
-    
+  Widget _buildTransactionCard(WalletTransaction t) {
+    final isPositive = t.amount > 0;
+    final dateText = _formatDate(t.date);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(20),
@@ -307,7 +283,7 @@ class _WalletScreenState extends State<WalletScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  transaction.description,
+                  t.description,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -315,18 +291,41 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  dateText,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getTypeColor(t.type).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        t.type.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: _getTypeColor(t.type),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      dateText,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
           Text(
-            '${isPositive ? '+' : ''}\$${transaction.amount.abs().toStringAsFixed(2)}',
+            '${isPositive ? '+' : ''}\$${t.amount.abs().toStringAsFixed(2)}',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -338,34 +337,28 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
+  Color _getTypeColor(String type) {
+    switch (type.toLowerCase()) {
+      case 'topup':
+      case 'refund':
+        return AppColors.success;
+      case 'ride':
+      case 'payment':
+        return AppColors.primary;
+      case 'penalty':
+      case 'fee':
+        return Colors.red;
+      default:
+        return AppColors.textSecondary;
+    }
+  }
+
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
-    if (difference.inDays == 0) {
-      return 'Today';
-    } else if (difference.inDays == 1) {
-      return 'Yesterday';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
-    }
+    if (difference.inDays == 0) return 'Today';
+    if (difference.inDays == 1) return 'Yesterday';
+    if (difference.inDays < 7) return '${difference.inDays} days ago';
+    return '${date.day}/${date.month}/${date.year}';
   }
-}
-
-class Transaction {
-  final String id;
-  final String type;
-  final String description;
-  final double amount;
-  final DateTime date;
-
-  Transaction({
-    required this.id,
-    required this.type,
-    required this.description,
-    required this.amount,
-    required this.date,
-  });
 }

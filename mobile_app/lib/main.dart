@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:mobile_app/storage.dart';
 import 'package:mobile_app/screens/auth_screen.dart';
 import 'package:mobile_app/screens/home_screen.dart';
 import 'package:mobile_app/utils/theme.dart';
@@ -8,19 +7,18 @@ import 'package:mobile_app/utils/constants.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile_app/providers/auth_provider.dart';
-
+import 'package:mobile_app/providers/home_provider.dart';
+import 'package:mobile_app/providers/wallet_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
   
-  // Set preferred orientations (portrait only)
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
   
-  // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -29,9 +27,13 @@ Future<void> main() async {
   );
   
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AuthProvider(),
-      child: MyApp(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => HomeProvider()),
+        ChangeNotifierProvider(create: (_) => WalletProvider()),
+      ],
+      child: const MyApp(),
     ),
   );
 }
@@ -44,43 +46,28 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  String? token;
-  bool loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadToken();
-  }
-
-  Future<void> _loadToken() async {
-    // Show splash screen for at least 3 seconds
-    await Future.delayed(AppDurations.splashDelay);
-
-    final storage = Storage();
-    final storedToken = await storage.get('user_id');
-
-    setState(() {
-      token = storedToken;
-      loading = false;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: "BikeShare",
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: loading
-          ? const SplashScreen()
-          : (token != null)
-              ? const HomeScreen()
-              : const AuthScreen(),
+      home: Consumer<AuthProvider>(
+        builder: (context, auth, child) {
+          // Show splash while auth is loading
+          if (!auth.isInitialized) {
+            return const SplashScreen();
+          }
+          
+          // Show appropriate screen based on auth status
+          return auth.userId != null 
+              ? const HomeScreen() 
+              : const AuthScreen();
+        },
+      ),
     );
   }
 }
-
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -138,7 +125,6 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Animated Bike Icon
               ScaleTransition(
                 scale: _scaleAnimation,
                 child: FadeTransition(
@@ -160,7 +146,6 @@ class _SplashScreenState extends State<SplashScreen>
               ),
               const SizedBox(height: 32),
               
-              // App Name
               FadeTransition(
                 opacity: _fadeAnimation,
                 child: const Text(
@@ -175,7 +160,6 @@ class _SplashScreenState extends State<SplashScreen>
               ),
               const SizedBox(height: 12),
               
-              // Tagline
               FadeTransition(
                 opacity: _fadeAnimation,
                 child: const Text(
@@ -189,7 +173,6 @@ class _SplashScreenState extends State<SplashScreen>
               ),
               const SizedBox(height: 60),
               
-              // Loading Indicator
               FadeTransition(
                 opacity: _fadeAnimation,
                 child: _buildLoadingDots(),
