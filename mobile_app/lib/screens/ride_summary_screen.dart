@@ -1,16 +1,12 @@
-// lib/screens/ride_summary_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:mobile_app/utils/constants.dart';
 import 'package:mobile_app/screens/home_screen.dart';
+import 'active_ride_screen.dart'; // to access RideSummaryData
 
 class RideSummaryScreen extends StatefulWidget {
   final RideSummaryData data;
 
-  const RideSummaryScreen({
-    super.key,
-    required this.data,
-  });
+  const RideSummaryScreen({super.key, required this.data});
 
   @override
   State<RideSummaryScreen> createState() => _RideSummaryScreenState();
@@ -28,11 +24,12 @@ class _RideSummaryScreenState extends State<RideSummaryScreen>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
-    _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
-    );
-    
+
+    _scaleAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
+
     _controller.forward();
   }
 
@@ -58,24 +55,25 @@ class _RideSummaryScreenState extends State<RideSummaryScreen>
 
   @override
   Widget build(BuildContext context) {
+    final d = widget.data;
+
     return Scaffold(
       body: Column(
         children: [
-          // Success Header
+          // Header
           Expanded(
             flex: 2,
             child: Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
+                  colors: [AppColors.primary, AppColors.primaryDark],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [AppColors.primary, AppColors.primaryDark],
                 ),
               ),
               child: SafeArea(
                 child: Column(
                   children: [
-                    // Back Button
                     Align(
                       alignment: Alignment.centerLeft,
                       child: IconButton(
@@ -83,13 +81,11 @@ class _RideSummaryScreenState extends State<RideSummaryScreen>
                         onPressed: _backToHome,
                       ),
                     ),
-                    
                     Expanded(
                       child: Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Success Icon Animation
                             ScaleTransition(
                               scale: _scaleAnimation,
                               child: Container(
@@ -107,8 +103,6 @@ class _RideSummaryScreenState extends State<RideSummaryScreen>
                               ),
                             ),
                             const SizedBox(height: 24),
-                            
-                            // Title
                             const Text(
                               AppStrings.greatRide,
                               style: TextStyle(
@@ -118,8 +112,6 @@ class _RideSummaryScreenState extends State<RideSummaryScreen>
                               ),
                             ),
                             const SizedBox(height: 8),
-                            
-                            // Subtitle
                             Text(
                               AppStrings.rideCompletedSuccess,
                               textAlign: TextAlign.center,
@@ -137,8 +129,8 @@ class _RideSummaryScreenState extends State<RideSummaryScreen>
               ),
             ),
           ),
-          
-          // Summary Details
+
+          // Details
           Expanded(
             flex: 3,
             child: Container(
@@ -153,66 +145,61 @@ class _RideSummaryScreenState extends State<RideSummaryScreen>
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    // Stats Grid
                     Row(
                       children: [
                         Expanded(
                           child: _buildStatItem(
                             AppStrings.duration,
-                            _formatDuration(widget.data.durationSeconds),
+                            _formatDuration(d.durationSeconds),
                           ),
                         ),
                         Expanded(
                           child: _buildStatItem(
                             AppStrings.distance,
-                            widget.data.distance,
+                            d.distance,
                           ),
                         ),
                         Expanded(
                           child: _buildStatItem(
                             AppStrings.fare,
-                            '\$${widget.data.fare.toStringAsFixed(2)}',
+                            '₹${d.fare.toStringAsFixed(2)}',
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
-                    
-                    // Divider
-                    const Divider(color: AppColors.border, height: 1),
+                    const Divider(color: AppColors.border),
                     const SizedBox(height: 24),
-                    
-                    // Trip Details
-                    _buildDetailRow(AppStrings.from, widget.data.from),
+
+                    // Trip Details (Updated)
+                    _buildDetailRow("Bike Model", d.bikeModel),
                     const SizedBox(height: 16),
-                    _buildDetailRow(AppStrings.to, widget.data.to),
+                    _buildDetailRow("Bike ID", d.bikeId),
                     const SizedBox(height: 16),
-                    _buildDetailRow(AppStrings.bikeId, widget.data.bikeId),
+                    _buildDetailRow("Asset Code", d.assetCode),
                     const SizedBox(height: 24),
-                    
-                    // Action Buttons
+
                     Row(
                       children: [
                         Expanded(
                           child: _buildActionButton(
-                            icon: AppIcons.download,
-                            label: AppStrings.download,
-                            onPressed: () {},
+                            AppIcons.download,
+                            AppStrings.download,
+                            () {},
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: _buildActionButton(
-                            icon: AppIcons.share,
-                            label: AppStrings.share,
-                            onPressed: () {},
+                            AppIcons.share,
+                            AppStrings.share,
+                            () {},
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    
-                    // Back to Home Button
+
                     SizedBox(
                       width: double.infinity,
                       height: 56,
@@ -266,34 +253,40 @@ class _RideSummaryScreenState extends State<RideSummaryScreen>
   }
 
   Widget _buildDetailRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 16,
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w500,
-          ),
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        label,
+        style: const TextStyle(
+          fontSize: 16,
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w500,
         ),
-        Text(
+      ),
+      Expanded(
+        child: Text(
           value,
+          textAlign: TextAlign.end,
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
           ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-  }) {
+
+  Widget _buildActionButton(
+    IconData icon,
+    String label,
+    VoidCallback onPressed,
+  ) {
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
@@ -316,26 +309,4 @@ class _RideSummaryScreenState extends State<RideSummaryScreen>
       ),
     );
   }
-}
-
-class RideSummaryData {
-  final String bikeId;
-  final String from;
-  final String to;
-  final DateTime startTime;
-  final DateTime endTime;
-  final int durationSeconds;
-  final String distance;
-  final double fare;
-
-  RideSummaryData({
-    required this.bikeId,
-    required this.from,
-    required this.to,
-    required this.startTime,
-    required this.endTime,
-    required this.durationSeconds,
-    required this.distance,
-    required this.fare,
-  });
 }
