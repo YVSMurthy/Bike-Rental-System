@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:mobile_app/providers/auth_provider.dart';
 import 'package:mobile_app/providers/home_provider.dart';
 import 'package:mobile_app/providers/wallet_provider.dart';
+import 'package:mobile_app/providers/ride_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +33,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => HomeProvider()),
         ChangeNotifierProvider(create: (_) => WalletProvider()),
+        ChangeNotifierProvider(create: (_) => RideProvider()),
       ],
       child: const MyApp(),
     ),

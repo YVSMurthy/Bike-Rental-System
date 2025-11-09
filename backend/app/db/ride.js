@@ -31,4 +31,34 @@ async function getRideSummary(userId) {
     }
 }
 
-module.exports = { getRideSummary };
+async function getRideHistory(userId) {
+    try {
+        // Base query
+        let query = supabase
+            .from('rides')
+            .select('id, amount_total, billed_seconds, start_time, end_time, start_locality, end_locality, distance_km')
+            .eq('user_id', userId)
+            .eq('status', 'completed')
+            .order('start_time', { ascending: false });
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        const items = (data || []).map(r => ({
+            id: r.id,
+            from: r.start_locality || '—',
+            to: r.end_locality || '—',
+            durationMinutes: Math.max(0, Math.floor((r.billed_seconds || 0) / 60)),
+            fare: Number(r.amount_total || 0),
+            date: (r.end_time || r.start_time),
+            distanceKm: r.distance_km || 0,
+        }));
+
+        return items;
+    } catch (err) {
+        console.error('Error in getRideHistory:', err);
+        return [];
+    }
+}
+
+module.exports = { getRideSummary, getRideHistory };

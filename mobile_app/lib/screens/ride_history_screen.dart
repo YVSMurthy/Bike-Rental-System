@@ -1,5 +1,3 @@
-// lib/screens/ride_history_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:mobile_app/utils/constants.dart';
 import 'package:mobile_app/widgets/bottom_nav.dart';
@@ -7,6 +5,9 @@ import 'package:mobile_app/screens/home_screen.dart';
 import 'package:mobile_app/screens/qr_scan_screen.dart';
 import 'package:mobile_app/screens/wallet_screen.dart';
 import 'package:mobile_app/screens/profile_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:mobile_app/providers/auth_provider.dart';
+import 'package:mobile_app/providers/ride_provider.dart';
 
 class RideHistoryScreen extends StatefulWidget {
   const RideHistoryScreen({super.key});
@@ -17,49 +18,33 @@ class RideHistoryScreen extends StatefulWidget {
 
 class _RideHistoryScreenState extends State<RideHistoryScreen> {
   String selectedFilter = 'all';
-  
-  final List<RideHistory> rides = [
-    RideHistory(
-      id: '1',
-      from: 'Downtown Station',
-      to: 'Central Park',
-      duration: '23m',
-      fare: 5.50,
-      date: DateTime.now(),
-      distance: '2.3 km',
-    ),
-    RideHistory(
-      id: '2',
-      from: 'Central Park',
-      to: 'Downtown Station',
-      duration: '18m',
-      fare: 3.25,
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      distance: '1.8 km',
-    ),
-    RideHistory(
-      id: '3',
-      from: 'Tech Hub',
-      to: 'Airport',
-      duration: '45m',
-      fare: 12.75,
-      date: DateTime.now().subtract(const Duration(days: 2)),
-      distance: '5.2 km',
-    ),
-    RideHistory(
-      id: '4',
-      from: 'Downtown Station',
-      to: 'Beach',
-      duration: '32m',
-      fare: 8.50,
-      date: DateTime.now().subtract(const Duration(days: 3)),
-      distance: '3.1 km',
-    ),
-  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRides();
+  }
+
+  Future<void> _loadRides() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final rides = Provider.of<RideProvider>(context, listen: false);
+
+    // Wait until auth is loaded
+    while (!auth.isInitialized) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+
+    await rides.refreshRides(auth);
+  }
+
+  Future<void> _onRefresh() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final rides = Provider.of<RideProvider>(context, listen: false);
+    await rides.refreshRides(auth);
+  }
 
   void _navigateToScreen(String screen) {
     Widget? destination;
-    
     switch (screen) {
       case 'home':
         destination = const HomeScreen();
@@ -71,22 +56,32 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
         destination = const WalletScreen();
         break;
       case 'history':
-        return; // Already on history
+        return;
       case 'profile':
         destination = const ProfileScreen();
         break;
     }
-    
     if (destination != null) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => destination!),
+        MaterialPageRoute(builder: (_) => destination!),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final rideProvider = Provider.of<RideProvider>(context);
+
+    if (!rideProvider.isInitialized) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final filteredRides = rideProvider.filtered(selectedFilter);
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -95,19 +90,55 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(AppStrings.rideHistory),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: rideProvider.isLoading ? null : _onRefresh,
+          ),
+        ],
       ),
       body: Column(
         children: [
-          // Filter Tabs
           _buildFilterTabs(),
-          
-          // Rides List
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(24),
               children: [
-                ...rides.map((ride) => _buildRideCard(ride)),
-                const SizedBox(height: 80), // Space for bottom nav
+                if (rideProvider.isLoading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else if (filteredRides.isEmpty)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: Text(
+                        "No rides found",
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  ...filteredRides.map(
+                    (r) => _buildRideCard(
+                      RideHistory(
+                        id: r.id,
+                        from: r.from,
+                        to: r.to,
+                        duration: r.formattedDuration,
+                        fare: r.fare,
+                        date: r.date,
+                        distance: r.formattedDistance,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 80),
               ],
             ),
           ),
@@ -144,12 +175,9 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
 
   Widget _buildFilterChip(String label, String value) {
     final isSelected = selectedFilter == value;
-    
     return GestureDetector(
       onTap: () {
-        setState(() {
-          selectedFilter = value;
-        });
+        setState(() => selectedFilter = value);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -185,9 +213,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // From/To and Fare
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
@@ -238,15 +264,9 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
               ),
             ],
           ),
-          
           const SizedBox(height: 16),
-          
-          // Divider
-          const Divider(color: AppColors.border, height: 1),
-          
+          const Divider(color: AppColors.border),
           const SizedBox(height: 16),
-          
-          // Trip Details
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -279,17 +299,11 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
-    final difference = now.difference(date);
-    
-    if (difference.inDays == 0) {
-      return 'Today';
-    } else if (difference.inDays == 1) {
-      return 'Yesterday';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
-    }
+    final diff = now.difference(date);
+    if (diff.inDays == 0) return 'Today';
+    if (diff.inDays == 1) return 'Yesterday';
+    if (diff.inDays < 7) return '${diff.inDays} days ago';
+    return '${date.day}/${date.month}/${date.year}';
   }
 }
 
